@@ -11,9 +11,9 @@ Package is not yet on pip, so you need to download the module and import.
 
 E.g.
 
-'''
+```
 import path/to/src/pyinctaxuk
-'''
+```
 
 ## Usage
 
@@ -27,9 +27,9 @@ Primary usage is the function:
 
 In any case, the function outputs a list:
 
-'''
+```
 [[post_tax_income, income_tax, national_insurance, student_loan_repayment]]
-'''
+```
 
 Other functions are mainly intermediate calculations.
 
