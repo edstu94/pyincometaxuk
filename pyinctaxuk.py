@@ -9,8 +9,12 @@ get_tax_breakdown -- return the amount paid in each band for NI or income tax
 get_annual_tax -- return the total NI or income tax paid
 get_annual_student_loan_rep -- return the student loan repayments
 format_currency -- convert a float to £x,xxx.xx format
-output_tax_results -- return (and optionally print) post tax income,
-    income tax paid, national insurance and student loan repayments
+output_annual_tax_results -- return (and optionally print) post tax income,
+    income tax paid, national insurance and student loan repayments on an
+    annual basis
+output_monthly_tax_results -- return (and optionally print) post tax income,
+    income tax paid, national insurance and student loan repayments on a
+    monthly basis, with a second list output for results in bonus period
 
 Example usage:
 Calculate the annual income tax for someone with a salary of £50k,
@@ -21,7 +25,6 @@ Calculate the annual income tax for someone with a salary of £50k,
 # UK income tax calculator
 # Initially excluding childcare, tax codes, >69 year olds,
 #    married/blind, resident in Scotland, overtime, non-salary-sacrifice pension
-#    annual bonuses
 
 # Inputs:
 #   Tax settings
@@ -129,6 +132,7 @@ def get_net_adjusted_income(gross_income, salary_sacrifice):
     Should be fed with an absolute salary sacrifice."""
 
     net_adjusted_income = gross_income - salary_sacrifice
+
     return net_adjusted_income
 
 def get_personal_allowance(gross_income, salary_sacrifice):
@@ -235,29 +239,31 @@ def format_currency(flt):
     """Return a formatted UK currency string from a float"""
     return '£{:,.2f}'.format(flt)
 
-def output_tax_results(gross_income, salary_sacrifice, student_loan_plan=False, print_results=True):
-    """Return all tax results
+def output_annual_tax_results(gross_income, salary_sacrifice, bonus=0, \
+        student_loan_plan=False, print_results=True):
+    """Return all tax results in annual terms
 
-    Inputs: gross income, salary sacrifice (absolute), student loan plan (plan_1, plan_2),
+    Inputs: gross income, bonus, salary sacrifice (absolute), student loan plan (plan_1, plan_2),
         boolean to print results (defaults to true)
     Outputs: returns a list with post tax income, income tax, national insurance and student loan
     """
-    taxable_income = get_total_taxable_income(gross_income, salary_sacrifice)
-    income_tax = get_annual_tax(gross_income, salary_sacrifice, 'income_tax')
-    national_insurance = get_annual_tax(gross_income, salary_sacrifice, 'national_insurance')
+    taxable_income = get_total_taxable_income(gross_income+bonus, salary_sacrifice)
+    income_tax = get_annual_tax(gross_income+bonus, salary_sacrifice, 'income_tax')
+    national_insurance = get_annual_tax(gross_income+bonus, salary_sacrifice, 'national_insurance')
 
     if student_loan_plan:
         student_loan_repayment = \
-         get_annual_student_loan_rep(gross_income, salary_sacrifice, student_loan_plan)
+         get_annual_student_loan_rep(gross_income+bonus, salary_sacrifice, student_loan_plan)
 
     else:
         student_loan_repayment = 0
 
-    post_tax_income = get_net_adjusted_income(gross_income, salary_sacrifice)\
+    post_tax_income = get_net_adjusted_income(gross_income+bonus, salary_sacrifice)\
      - income_tax - national_insurance - student_loan_repayment
 
     if print_results:
         print('Your gross salary is {}'.format(format_currency(gross_income)))
+        print('Your annual bonus is {}'.format(format_currency(bonus)))
         print('You have gross salary deductions of {}'.format(format_currency(salary_sacrifice)))
         print('Your total taxable income is therefore {}'.format(format_currency(taxable_income)))
         print('')
@@ -268,3 +274,62 @@ def output_tax_results(gross_income, salary_sacrifice, student_loan_plan=False, 
         print('Total annual income after tax: {}'.format(format_currency(post_tax_income)))
 
     return [post_tax_income, income_tax, national_insurance, student_loan_repayment]
+
+def output_monthly_tax_results(gross_income, salary_sacrifice, bonus=0, \
+        student_loan_plan=False, print_results=True):
+    """Return all tax results in monthly terms, including bonus period if applicable.
+
+    Inputs: gross income, bonus (default 0), salary sacrifice, student loan plan
+    (plan_1, plan_2, defaults false), boolean to print results (defaults true)
+
+    Outputs: returns either one or two zipped lists, one with monthly earnings in normal
+    period and one with monthly earnings in bonus period (blank if no bonus specified)
+    """
+
+    annual_income_ex_bonus = \
+     output_annual_tax_results(gross_income, salary_sacrifice, 0, student_loan_plan,\
+      False)
+
+    monthly_income_ex_bonus = [i/12 for i in annual_income_ex_bonus]
+
+    if bonus > 0:
+
+        annual_income_inc_bonus = \
+        output_annual_tax_results(gross_income, salary_sacrifice, bonus, student_loan_plan, \
+        False)
+
+        monthly_income_in_bonus_period = \
+        [a + b - c for a, b, c in zip(monthly_income_ex_bonus, \
+        annual_income_inc_bonus, annual_income_ex_bonus)]
+
+        output = zip(monthly_income_ex_bonus, monthly_income_in_bonus_period)
+
+    else:
+
+        output = monthly_income_ex_bonus
+
+    if print_results:
+        print('IN A REGULAR MONTH:')
+        print('Income tax: {}'.format(format_currency(monthly_income_ex_bonus[1])))
+        print('National insurance: {}'.format(format_currency(monthly_income_ex_bonus[2])))
+        print('Student loan repayments: {}'.format(format_currency(monthly_income_ex_bonus[3])))
+        print('Total monthly income after tax: {}'.format(\
+         format_currency(monthly_income_ex_bonus[0])))
+        print('')
+
+        if bonus > 0:
+
+            print('IN A BONUS MONTH:')
+            print('Income tax: {}'.format(format_currency(\
+             monthly_income_in_bonus_period[1])))
+            print('National insurance: {}'.format(format_currency(\
+             monthly_income_in_bonus_period[2])))
+            print('Student loan repayments: {}'.format(format_currency(\
+             monthly_income_in_bonus_period[3])))
+            print('Total monthly income after tax: {}'.format(format_currency(\
+             monthly_income_in_bonus_period[0])))
+
+        else:
+            print('No bonus specified.')
+
+    return output
